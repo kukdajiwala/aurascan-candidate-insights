@@ -22,22 +22,62 @@ import {
 const DashboardPage = () => {
   const navigate = useNavigate();
   const [analysisData, setAnalysisData] = useState({
-    personalityScore: 85,
-    trustScore: 92,
-    riskLevel: 'Low',
-    loyaltyPrediction: 88,
-    consistencyScore: 90,
-    behaviorPrediction: 'Positive',
-    cognitiveMapping: 'High',
-    careerGrowth: 'Excellent',
-    aiDetection: 'Human'
+    personalityScore: 0,
+    trustScore: 0,
+    riskLevel: 'Unknown',
+    loyaltyPrediction: 0,
+    consistencyScore: 0,
+    behaviorPrediction: 'Pending',
+    cognitiveMapping: 'Unknown',
+    careerGrowth: 'Unknown',
+    aiDetection: 'Pending'
+  });
+
+  const [candidateInfo, setCandidateInfo] = useState({
+    name: 'Guest User',
+    email: ''
   });
 
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate AI analysis loading
-    setTimeout(() => setLoading(false), 2000);
+    // Load real analysis data from localStorage
+    const loadAnalysisData = () => {
+      try {
+        const savedAnalysis = localStorage.getItem('latest_analysis');
+        const savedCandidateInfo = localStorage.getItem('candidate_info');
+        
+        if (savedAnalysis) {
+          const parsedAnalysis = JSON.parse(savedAnalysis);
+          setAnalysisData({
+            personalityScore: parsedAnalysis.personalityScore || 0,
+            trustScore: parsedAnalysis.trustScore || 0,
+            riskLevel: parsedAnalysis.riskLevel || 'Unknown',
+            loyaltyPrediction: parsedAnalysis.loyaltyPrediction || 0,
+            consistencyScore: parsedAnalysis.consistencyScore || 0,
+            behaviorPrediction: parsedAnalysis.behaviorPrediction || 'Pending',
+            cognitiveMapping: parsedAnalysis.cognitiveMapping || 'Unknown',
+            careerGrowth: parsedAnalysis.careerGrowth || 'Unknown',
+            aiDetection: parsedAnalysis.aiDetection || 'Pending'
+          });
+        }
+        
+        if (savedCandidateInfo) {
+          const parsedCandidateInfo = JSON.parse(savedCandidateInfo);
+          setCandidateInfo({
+            name: parsedCandidateInfo.name || 'Guest User',
+            email: parsedCandidateInfo.email || ''
+          });
+        }
+      } catch (error) {
+        console.error('Failed to load analysis data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Simulate loading delay
+    setTimeout(loadAnalysisData, 1500);
   }, []);
 
   const getRiskColor = (risk: string) => {
@@ -101,10 +141,10 @@ const DashboardPage = () => {
         {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-aura-gray-900 mb-2">
-            Welcome Back, Candidate!
+            Welcome Back, {candidateInfo.name}!
           </h1>
           <p className="text-xl text-aura-gray-600">
-            Your AI analysis results are ready for review
+            {analysisData.personalityScore > 0 ? 'Your AI analysis results are ready for review' : 'Complete an interview to see your AI analysis results'}
           </p>
         </div>
 
@@ -233,35 +273,52 @@ const DashboardPage = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                    <h4 className="font-semibold text-green-800 mb-2">Strengths</h4>
-                    <ul className="text-sm text-green-700 space-y-1">
-                      <li>• High trust and reliability scores</li>
-                      <li>• Excellent communication skills</li>
-                      <li>• Strong leadership potential</li>
-                      <li>• Consistent behavioral patterns</li>
-                    </ul>
-                  </div>
+                  {analysisData.personalityScore > 0 ? (
+                    <>
+                      <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                        <h4 className="font-semibold text-green-800 mb-2">AI-Generated Insights</h4>
+                        <div className="text-sm text-green-700 space-y-1">
+                          <p>• Trust Score: <strong>{analysisData.trustScore}%</strong></p>
+                          <p>• Risk Level: <strong>{analysisData.riskLevel}</strong></p>
+                          <p>• Behavior: <strong>{analysisData.behaviorPrediction}</strong></p>
+                          <p>• AI Detection: <strong>{analysisData.aiDetection}</strong></p>
+                        </div>
+                      </div>
 
-                  <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                    <h4 className="font-semibold text-blue-800 mb-2">Development Areas</h4>
-                    <ul className="text-sm text-blue-700 space-y-1">
-                      <li>• Enhanced technical skills training</li>
-                      <li>• Cross-functional collaboration</li>
-                      <li>• Strategic thinking development</li>
-                      <li>• Industry-specific knowledge</li>
-                    </ul>
-                  </div>
+                      <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <h4 className="font-semibold text-blue-800 mb-2">Analysis Complete</h4>
+                        <p className="text-sm text-blue-700">
+                          Your responses have been analyzed using advanced AI algorithms. 
+                          The results show your cognitive mapping as <strong>{analysisData.cognitiveMapping}</strong> 
+                          with a career growth potential rated as <strong>{analysisData.careerGrowth}</strong>.
+                        </p>
+                      </div>
 
-                  <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-                    <h4 className="font-semibold text-yellow-800 mb-2">Recommended Next Steps</h4>
-                    <ul className="text-sm text-yellow-700 space-y-1">
-                      <li>• Schedule technical interview</li>
-                      <li>• Cultural fit assessment</li>
-                      <li>• Reference check process</li>
-                      <li>• Final decision meeting</li>
-                    </ul>
-                  </div>
+                      <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                        <h4 className="font-semibold text-yellow-800 mb-2">Next Steps</h4>
+                        <ul className="text-sm text-yellow-700 space-y-1">
+                          <li>• Review detailed analysis report</li>
+                          <li>• Schedule follow-up interview if needed</li>
+                          <li>• Contact HR for next phase</li>
+                          <li>• Prepare for technical assessment</li>
+                        </ul>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 text-center">
+                      <h4 className="font-semibold text-gray-800 mb-2">No Analysis Available</h4>
+                      <p className="text-sm text-gray-600 mb-4">
+                        Complete an AI interview to get personalized insights and recommendations.
+                      </p>
+                      <Button
+                        onClick={() => navigate('/interview')}
+                        className="aura-gradient text-white"
+                      >
+                        <PlayCircle className="mr-2 h-4 w-4" />
+                        Start Interview
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>

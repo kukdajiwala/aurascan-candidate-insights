@@ -1,4 +1,5 @@
 
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -22,60 +23,95 @@ const AnalysisPage = () => {
   const { candidateId } = useParams();
   const navigate = useNavigate();
 
-  // Mock detailed analysis data
-  const candidateData = {
+  // Load real analysis data from localStorage
+  const [candidateData, setCandidateData] = useState({
     id: candidateId,
-    name: 'Sarah Johnson',
-    email: 'sarah.j@email.com',
+    name: 'Unknown Candidate',
+    email: 'unknown@email.com',
     photo: '/api/placeholder/200/200',
-    submissionDate: '2024-01-15',
-    interviewDuration: '45 minutes',
+    submissionDate: new Date().toISOString().split('T')[0],
+    interviewDuration: '0 minutes',
     analysis: {
-      personalityScore: 92,
-      trustScore: 95,
-      riskLevel: 'Low',
-      loyaltyPrediction: 88,
-      consistencyScore: 94,
-      behaviorPrediction: 'Highly Positive',
-      cognitiveMapping: 'Excellent',
-      careerGrowth: 'High Potential',
-      aiDetection: 'Human Responses',
-      communicationSkills: 89,
-      technicalAptitude: 87,
-      leadershipPotential: 91,
-      stressHandling: 85
+      personalityScore: 0,
+      trustScore: 0,
+      riskLevel: 'Unknown',
+      loyaltyPrediction: 0,
+      consistencyScore: 0,
+      behaviorPrediction: 'Pending',
+      cognitiveMapping: 'Unknown',
+      careerGrowth: 'Unknown',
+      aiDetection: 'Pending',
+      communicationSkills: 0,
+      technicalAptitude: 0,
+      leadershipPotential: 0,
+      stressHandling: 0
     },
     voiceAnalysis: {
-      tonality: 'Confident',
-      speechClarity: 95,
-      emotionalStability: 90,
-      confidence: 88
+      tonality: 'Unknown',
+      speechClarity: 0,
+      emotionalStability: 0,
+      confidence: 0
     },
     facialAnalysis: {
-      attentiveness: 92,
-      genuineness: 89,
-      engagement: 94,
-      trustworthiness: 96
+      attentiveness: 0,
+      genuineness: 0,
+      engagement: 0,
+      trustworthiness: 0
     },
-    strengths: [
-      'Excellent communication skills',
-      'High emotional intelligence',
-      'Strong leadership qualities',
-      'Consistent behavioral patterns',
-      'Authentic and genuine responses'
-    ],
-    weaknesses: [
-      'Could improve technical depth',
-      'Needs more industry-specific knowledge',
-      'Occasional hesitation on complex topics'
-    ],
-    recommendations: [
-      'Proceed to final interview round',
-      'Technical skills assessment recommended',
-      'Cultural fit interview suggested',
-      'Reference check priority candidate'
-    ]
-  };
+    strengths: ['Analysis pending'],
+    weaknesses: ['Analysis pending'],
+    recommendations: ['Complete interview first']
+  });
+
+  // Load data on component mount
+  useEffect(() => {
+    const savedAnalysis = localStorage.getItem('latest_analysis');
+    const savedCandidateInfo = localStorage.getItem('candidate_info');
+    
+    if (savedAnalysis && savedCandidateInfo) {
+      const analysis = JSON.parse(savedAnalysis);
+      const candidateInfo = JSON.parse(savedCandidateInfo);
+      
+      setCandidateData({
+        id: candidateId,
+        name: candidateInfo.name || 'Unknown Candidate',
+        email: candidateInfo.email || 'unknown@email.com',
+        photo: '/api/placeholder/200/200',
+        submissionDate: new Date().toISOString().split('T')[0],
+        interviewDuration: '45 minutes', // This would come from actual interview data
+        analysis: {
+          personalityScore: analysis.personalityScore || 0,
+          trustScore: analysis.trustScore || 0,
+          riskLevel: analysis.riskLevel || 'Unknown',
+          loyaltyPrediction: analysis.loyaltyPrediction || 0,
+          consistencyScore: analysis.consistencyScore || 0,
+          behaviorPrediction: analysis.behaviorPrediction || 'Pending',
+          cognitiveMapping: analysis.cognitiveMapping || 'Unknown',
+          careerGrowth: analysis.careerGrowth || 'Unknown',
+          aiDetection: analysis.aiDetection || 'Pending',
+          communicationSkills: analysis.communicationSkills || 0,
+          technicalAptitude: analysis.technicalAptitude || 0,
+          leadershipPotential: analysis.leadershipPotential || 0,
+          stressHandling: analysis.stressHandling || 0
+        },
+        voiceAnalysis: {
+          tonality: analysis.mood || 'Unknown',
+          speechClarity: 95, // These would come from actual voice analysis
+          emotionalStability: analysis.emotionalStability || 0,
+          confidence: analysis.confidenceLevel || 0
+        },
+        facialAnalysis: {
+          attentiveness: 92, // These would come from actual facial analysis
+          genuineness: 89,
+          engagement: 94,
+          trustworthiness: analysis.trustScore || 0
+        },
+        strengths: analysis.strengths || ['Analysis pending'],
+        weaknesses: analysis.weaknesses || ['Analysis pending'],
+        recommendations: analysis.recommendations || ['Complete interview first']
+      });
+    }
+  }, [candidateId]);
 
   const getRiskColor = (risk: string) => {
     switch (risk.toLowerCase()) {
