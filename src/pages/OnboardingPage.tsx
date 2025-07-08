@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Brain, Upload, Camera, Mic, FileText, User, Mail, CheckCircle } from 'lucide-react';
+import { Brain, Upload, Camera, Mic, FileText, User, Mail, CheckCircle, AlertCircle } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
 const OnboardingPage = () => {
@@ -22,93 +22,217 @@ const OnboardingPage = () => {
   });
   const [isRecording, setIsRecording] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [permissionDenied, setPermissionDenied] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const recordingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const totalSteps = 4;
   const progress = (currentStep / totalSteps) * 100;
 
+  const checkMediaPermissions = async () => {
+    try {
+      // Check if getUserMedia is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Media devices not supported');
+      }
+      return true;
+    } catch (error) {
+      console.error('Media permissions check failed:', error);
+      return false;
+    }
+  };
+
   const startCamera = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      setPermissionDenied(false);
+      
+      const hasPermissions = await checkMediaPermissions();
+      if (!hasPermissions) {
+        throw new Error('Media devices not supported in this browser');
+      }
+
+      // Stop any existing stream first
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+
+      const constraints = {
+        video: {
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          facingMode: 'user'
+        },
+        audio: false
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      streamRef.current = stream;
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        setCameraActive(true);
+        videoRef.current.onloadedmetadata = () => {
+          setCameraActive(true);
+          toast({
+            title: "Camera Started",
+            description: "Camera is ready for photo capture"
+          });
+        };
       }
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Camera access failed:', error);
+      setPermissionDenied(true);
+      setCameraActive(false);
+      
+      let errorMessage = "Please allow camera access and try again";
+      
+      if (error.name === 'NotAllowedError') {
+        errorMessage = "Camera permission denied. Please allow camera access in your browser settings.";
+      } else if (error.name === 'NotFoundError') {
+        errorMessage = "No camera found. Please connect a camera and try again.";
+      } else if (error.name === 'NotSupportedError') {
+        errorMessage = "Camera not supported in this browser.";
+      }
+
       toast({
         title: "Camera Access Failed",
-        description: "Please allow camera access",
+        description: errorMessage,
         variant: "destructive"
       });
     }
   };
 
   const capturePhoto = () => {
-    if (videoRef.current) {
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d');
-      if (context) {
-        canvas.width = videoRef.current.videoWidth;
-        canvas.height = videoRef.current.videoHeight;
-        context.drawImage(videoRef.current, 0, 0);
+    if (videoRef.current && cameraActive) {
+      try {
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
         
-        canvas.toBlob((blob) => {
-          if (blob) {
-            const file = new File([blob], 'face-photo.jpg', { type: 'image/jpeg' });
-            setFormData({...formData, facePhoto: file});
-            toast({
-              title: "Photo Captured",
-              description: "Face photo captured successfully"
-            });
-          }
+        if (context && videoRef.current.videoWidth && videoRef.current.videoHeight) {
+          canvas.width = videoRef.current.videoWidth;
+          canvas.height = videoRef.current.videoHeight;
+          context.drawImage(videoRef.current, 0, 0);
+          
+          canvas.toBlob((blob) => {
+            if (blob) {
+              const file = new File([blob], 'face-photo.jpg', { type: 'image/jpeg' });
+              setFormData({...formData, facePhoto: file});
+              
+              // Stop camera after capture
+              stopCamera();
+              
+              toast({
+                title: "Photo Captured",
+                description: "Face photo captured successfully"
+              });
+            }
+          }, 'image/jpeg', 0.8);
+        }
+      } catch (error) {
+        console.error('Photo capture failed:', error);
+        toast({
+          title: "Capture Failed",
+          description: "Failed to capture photo. Please try again.",
+          variant: "destructive"
         });
       }
-      
-      // Stop camera
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream?.getTracks().forEach(track => track.stop());
-      setCameraActive(false);
     }
+  };
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    setCameraActive(false);
   };
 
   const startVoiceRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      setPermissionDenied(false);
+      setRecordingTime(0);
+
+      const hasPermissions = await checkMediaPermissions();
+      if (!hasPermissions) {
+        throw new Error('Media devices not supported in this browser');
+      }
+
+      const constraints = {
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          sampleRate: 44100
+        },
+        video: false
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
+      });
+      
       mediaRecorderRef.current = mediaRecorder;
       
       const chunks: BlobPart[] = [];
+      
       mediaRecorder.ondataavailable = (event) => {
-        chunks.push(event.data);
+        if (event.data.size > 0) {
+          chunks.push(event.data);
+        }
       };
       
       mediaRecorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'audio/mp3' });
-        const file = new File([blob], 'voice-sample.mp3', { type: 'audio/mp3' });
+        const blob = new Blob(chunks, { type: 'audio/webm' });
+        const file = new File([blob], 'voice-sample.webm', { type: 'audio/webm' });
         setFormData({...formData, voiceSample: file});
+        
+        // Stop all tracks
+        stream.getTracks().forEach(track => track.stop());
+        
         toast({
           title: "Voice Recorded",
-          description: "Voice sample captured successfully"
+          description: `Voice sample recorded successfully (${recordingTime}s)`
         });
       };
       
       mediaRecorder.start();
       setIsRecording(true);
       
-      // Auto stop after 10 seconds
-      setTimeout(() => {
-        if (mediaRecorder.state === 'recording') {
-          mediaRecorder.stop();
-          setIsRecording(false);
-          stream.getTracks().forEach(track => track.stop());
-        }
-      }, 10000);
+      // Start timer
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
       
-    } catch (error) {
+      // Auto stop after 10 seconds
+      recordingTimeoutRef.current = setTimeout(() => {
+        stopVoiceRecording();
+      }, 10000);
+
+      toast({
+        title: "Recording Started",
+        description: "Speak clearly for up to 10 seconds"
+      });
+      
+    } catch (error: any) {
+      console.error('Microphone access failed:', error);
+      setPermissionDenied(true);
+      setIsRecording(false);
+      
+      let errorMessage = "Please allow microphone access and try again";
+      
+      if (error.name === 'NotAllowedError') {
+        errorMessage = "Microphone permission denied. Please allow microphone access in your browser settings.";
+      } else if (error.name === 'NotFoundError') {
+        errorMessage = "No microphone found. Please connect a microphone and try again.";
+      }
+
       toast({
         title: "Microphone Access Failed",
-        description: "Please allow microphone access",
+        description: errorMessage,
         variant: "destructive"
       });
     }
@@ -119,12 +243,30 @@ const OnboardingPage = () => {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
     }
+    
+    if (recordingTimeoutRef.current) {
+      clearTimeout(recordingTimeoutRef.current);
+      recordingTimeoutRef.current = null;
+    }
+    
+    if (recordingIntervalRef.current) {
+      clearInterval(recordingIntervalRef.current);
+      recordingIntervalRef.current = null;
+    }
   };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, fileType: 'resume') => {
     const file = event.target.files?.[0];
     if (file) {
       if (fileType === 'resume' && file.type === 'application/pdf') {
+        if (file.size > 10 * 1024 * 1024) { // 10MB limit
+          toast({
+            title: "File Too Large",
+            description: "Please upload a PDF file smaller than 10MB",
+            variant: "destructive"
+          });
+          return;
+        }
         setFormData({...formData, resume: file});
         toast({
           title: "Resume Uploaded",
@@ -197,27 +339,48 @@ const OnboardingPage = () => {
               <p className="text-aura-gray-600">We'll capture your photo for analysis</p>
             </div>
             
-            {!cameraActive ? (
+            {!cameraActive && !formData.facePhoto ? (
               <div className="text-center">
                 <div className="w-32 h-32 mx-auto border-4 border-dashed border-aura-blue-300 rounded-full flex items-center justify-center mb-4">
                   <Camera className="h-12 w-12 text-aura-blue-500" />
                 </div>
+                
+                {permissionDenied && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <AlertCircle className="h-4 w-4 text-red-600" />
+                      <p className="text-sm text-red-700">
+                        Camera access required. Please allow camera permissions and try again.
+                      </p>
+                    </div>
+                  </div>
+                )}
+                
                 <Button onClick={startCamera} className="aura-gradient text-white">
+                  <Camera className="mr-2 h-4 w-4" />
                   Start Camera
                 </Button>
               </div>
-            ) : (
+            ) : cameraActive ? (
               <div className="text-center">
                 <video
                   ref={videoRef}
                   autoPlay
+                  playsInline
+                  muted
                   className="w-64 h-48 mx-auto rounded-lg border-2 border-aura-blue-300 mb-4"
                 />
-                <Button onClick={capturePhoto} className="aura-gradient text-white">
-                  Capture Photo
-                </Button>
+                <div className="space-x-2">
+                  <Button onClick={capturePhoto} className="aura-gradient text-white">
+                    <Camera className="mr-2 h-4 w-4" />
+                    Capture Photo
+                  </Button>
+                  <Button onClick={stopCamera} variant="outline">
+                    Cancel
+                  </Button>
+                </div>
               </div>
-            )}
+            ) : null}
             
             {formData.facePhoto && (
               <div className="text-center text-green-600">
@@ -234,7 +397,7 @@ const OnboardingPage = () => {
             <div className="text-center mb-6">
               <Mic className="h-12 w-12 text-aura-blue-600 mx-auto mb-4" />
               <h3 className="text-xl font-semibold">Voice Sample</h3>
-              <p className="text-aura-gray-600">Record a 10-second voice sample</p>
+              <p className="text-aura-gray-600">Record a voice sample for analysis</p>
             </div>
             
             <div className="text-center">
@@ -242,21 +405,36 @@ const OnboardingPage = () => {
                 <Mic className={`h-12 w-12 ${isRecording ? 'text-red-500 animate-pulse' : 'text-aura-blue-500'}`} />
               </div>
               
-              {!isRecording ? (
-                <Button onClick={startVoiceRecording} className="aura-gradient text-white">
-                  Start Recording
-                </Button>
-              ) : (
-                <Button onClick={stopVoiceRecording} variant="destructive">
-                  Stop Recording
-                </Button>
+              {permissionDenied && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <AlertCircle className="h-4 w-4 text-red-600" />
+                    <p className="text-sm text-red-700">
+                      Microphone access required. Please allow microphone permissions and try again.
+                    </p>
+                  </div>
+                </div>
               )}
               
-              {isRecording && (
-                <p className="text-sm text-aura-gray-600 mt-2">
-                  Recording... Please speak clearly
-                </p>
-              )}
+              {!isRecording && !formData.voiceSample ? (
+                <Button onClick={startVoiceRecording} className="aura-gradient text-white">
+                  <Mic className="mr-2 h-4 w-4" />
+                  Start Recording
+                </Button>
+              ) : isRecording ? (
+                <div className="space-y-4">
+                  <div className="text-lg font-medium text-red-600">
+                    Recording... {recordingTime}s / 10s
+                  </div>
+                  <Button onClick={stopVoiceRecording} variant="destructive">
+                    <Mic className="mr-2 h-4 w-4" />
+                    Stop Recording
+                  </Button>
+                  <p className="text-sm text-aura-gray-600">
+                    Please speak clearly. Recording will auto-stop after 10 seconds.
+                  </p>
+                </div>
+              ) : null}
             </div>
             
             {formData.voiceSample && (
@@ -309,6 +487,14 @@ const OnboardingPage = () => {
         return null;
     }
   };
+
+  // Cleanup on unmount
+  React.useEffect(() => {
+    return () => {
+      stopCamera();
+      stopVoiceRecording();
+    };
+  }, []);
 
   return (
     <div className="min-h-screen gradient-bg flex items-center justify-center p-4">
