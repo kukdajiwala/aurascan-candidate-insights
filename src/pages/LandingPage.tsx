@@ -9,6 +9,7 @@ const LandingPage = () => {
   const navigate = useNavigate();
   const [currentText, setCurrentText] = useState('');
   const [textIndex, setTextIndex] = useState(0);
+  const [isTyping, setIsTyping] = useState(true);
   
   const texts = [
     'Advanced AI-Powered HR Analytics',
@@ -18,28 +19,41 @@ const LandingPage = () => {
   ];
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setTextIndex((prev) => (prev + 1) % texts.length);
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    setCurrentText('');
-    const text = texts[textIndex];
-    let index = 0;
+    let typingTimeout: NodeJS.Timeout;
+    let nextTextTimeout: NodeJS.Timeout;
     
-    const typeInterval = setInterval(() => {
-      if (index <= text.length) {
-        setCurrentText(text.slice(0, index));
-        index++;
+    const currentFullText = texts[textIndex];
+    
+    if (isTyping) {
+      // Typing effect
+      if (currentText.length < currentFullText.length) {
+        typingTimeout = setTimeout(() => {
+          setCurrentText(currentFullText.slice(0, currentText.length + 1));
+        }, 80);
       } else {
-        clearInterval(typeInterval);
+        // Text is complete, wait then start erasing
+        nextTextTimeout = setTimeout(() => {
+          setIsTyping(false);
+        }, 2000);
       }
-    }, 100);
+    } else {
+      // Erasing effect
+      if (currentText.length > 0) {
+        typingTimeout = setTimeout(() => {
+          setCurrentText(currentText.slice(0, -1));
+        }, 50);
+      } else {
+        // Text is erased, move to next text
+        setTextIndex((prev) => (prev + 1) % texts.length);
+        setIsTyping(true);
+      }
+    }
 
-    return () => clearInterval(typeInterval);
-  }, [textIndex, texts]);
+    return () => {
+      clearTimeout(typingTimeout);
+      clearTimeout(nextTextTimeout);
+    };
+  }, [currentText, textIndex, isTyping, texts]);
 
   const features = [
     {
@@ -115,7 +129,7 @@ const LandingPage = () => {
             </h1>
             
             <div className="h-16 mb-8">
-              <p className="text-xl sm:text-2xl text-aura-gray-600 font-medium">
+              <p className="text-xl sm:text-2xl text-aura-gray-600 font-medium min-h-[2rem]">
                 {currentText}
                 <span className="animate-blink">|</span>
               </p>
