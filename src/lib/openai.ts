@@ -1,14 +1,30 @@
 import OpenAI from 'openai';
 
-// Note: In production, this should be handled through a backend API
+// Note: In production, use Supabase Edge Functions with secrets
 // For demo purposes, we'll use client-side integration
 let openaiClient: OpenAI | null = null;
 
 export const initializeOpenAI = (apiKey: string) => {
-  openaiClient = new OpenAI({
-    apiKey: apiKey,
-    dangerouslyAllowBrowser: true // Only for demo purposes
-  });
+  try {
+    openaiClient = new OpenAI({
+      apiKey: apiKey,
+      dangerouslyAllowBrowser: true // Only for demo purposes
+    });
+    return true;
+  } catch (error) {
+    console.error('Failed to initialize OpenAI:', error);
+    return false;
+  }
+};
+
+// Get API key from localStorage or environment
+export const getStoredAPIKey = (): string | null => {
+  return localStorage.getItem('openai_api_key');
+};
+
+// Validate API key format
+export const isValidAPIKey = (key: string): boolean => {
+  return key.startsWith('sk-') && key.length > 20;
 };
 
 export interface AnalysisResult {
@@ -61,6 +77,67 @@ export interface AnalysisResult {
     riskFactors: string[];
   };
 }
+
+// Analyze PDF content
+export const analyzePDFContent = async (pdfText: string, type: 'resume' | 'coverLetter'): Promise<any> => {
+  if (!openaiClient) {
+    throw new Error('OpenAI client not initialized');
+  }
+
+  const prompt = `Analyze this ${type} and extract key information:
+
+Content: "${pdfText}"
+
+Provide analysis as JSON:
+{
+  "skills": ["skill1", "skill2"],
+  "experience": "years of experience",
+  "education": "education level",
+  "redFlags": ["flag1", "flag2"],
+  "strengths": ["strength1", "strength2"],
+  "relevanceScore": 85,
+  "professionalismScore": 90
+}`;
+
+  const response = await openaiClient.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [{ role: 'user', content: prompt }],
+    temperature: 0.3,
+    max_tokens: 500
+  });
+
+  return JSON.parse(response.choices[0]?.message?.content || '{}');
+};
+
+// Analyze voice for emotional cues
+export const analyzeVoiceEmotion = async (transcript: string): Promise<any> => {
+  if (!openaiClient) {
+    throw new Error('OpenAI client not initialized');
+  }
+
+  const prompt = `Analyze this speech transcript for emotional and behavioral cues:
+
+Transcript: "${transcript}"
+
+Provide analysis as JSON:
+{
+  "confidence": 85,
+  "emotionalStability": 78,
+  "stressIndicators": ["hesitation", "repetition"],
+  "deceptionRisk": 15,
+  "overallTone": "confident",
+  "speechClarity": 92
+}`;
+
+  const response = await openaiClient.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [{ role: 'user', content: prompt }],
+    temperature: 0.2,
+    max_tokens: 300
+  });
+
+  return JSON.parse(response.choices[0]?.message?.content || '{}');
+};
 
 export const analyzeCandidate = async (
   candidateData: {

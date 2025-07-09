@@ -23,9 +23,11 @@ import {
   Upload
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import { analyzeCandidate, transcribeAudio, AnalysisResult, initializeOpenAI } from '@/lib/openai';
+import { analyzeCandidate, transcribeAudio, AnalysisResult, initializeOpenAI, getStoredAPIKey } from '@/lib/openai';
 import OpenAISetup from '@/components/OpenAISetup';
 import FileUpload from '@/components/FileUpload';
+import InterviewQA from '@/components/InterviewQA';
+import PDFReportGenerator from '@/components/PDFReportGenerator';
 
 const InterviewPage = () => {
   const navigate = useNavigate();
@@ -38,6 +40,17 @@ const InterviewPage = () => {
   const [candidateName, setCandidateName] = useState('');
   const [candidateEmail, setCandidateEmail] = useState('');
   const [infoCollected, setInfoCollected] = useState(false);
+  
+  // File upload states
+  const [uploadedFiles, setUploadedFiles] = useState<{
+    resume?: string;
+    coverLetter?: string;
+    photo?: string;
+  }>({});
+  
+  // Q&A states
+  const [showQA, setShowQA] = useState(false);
+  const [qaAnswers, setQAAnswers] = useState<Array<{questionId: string, answer: string, accuracy: number}>>([]);
   
   // Interview states
   const [isRecording, setIsRecording] = useState(false);
@@ -74,10 +87,13 @@ const InterviewPage = () => {
 
   // Check for existing API key on mount
   useEffect(() => {
-    const savedKey = localStorage.getItem('openai_api_key');
+    const savedKey = getStoredAPIKey();
     if (savedKey) {
-      initializeOpenAI(savedKey);
-      setIsSetupComplete(true);
+      const initialized = initializeOpenAI(savedKey);
+      setIsSetupComplete(initialized);
+      if (!initialized) {
+        localStorage.removeItem('openai_api_key'); // Remove invalid key
+      }
     }
   }, []);
 
@@ -258,7 +274,9 @@ const InterviewPage = () => {
         name: candidateName,
         email: candidateEmail,
         textResponse: combinedResponses,
-        voiceTranscription: combinedResponses
+        voiceTranscription: combinedResponses,
+        resumeContent: uploadedFiles.resume,
+        coverLetterContent: uploadedFiles.coverLetter
       });
       
       setAnalysisResult(analysis);
