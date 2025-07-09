@@ -31,6 +31,35 @@ export interface AnalysisResult {
   strengths: string[];
   weaknesses: string[];
   recommendations: string[];
+  // Enhanced analysis fields
+  voiceAnalysis: {
+    tonality: string;
+    speechClarity: number;
+    emotionalStability: number;
+    confidence: number;
+    lyingIndicators: string[];
+  };
+  facialAnalysis: {
+    attentiveness: number;
+    genuineness: number;
+    engagement: number;
+    trustworthiness: number;
+    microExpressions: string[];
+  };
+  resumeAnalysis?: {
+    relevanceScore: number;
+    experienceMatch: number;
+    skillsAlignment: number;
+    redFlags: string[];
+    highlights: string[];
+  };
+  detailedInsights: {
+    workStyle: string;
+    teamFit: string;
+    culturalAlignment: number;
+    growthPotential: string;
+    riskFactors: string[];
+  };
 }
 
 export const analyzeCandidate = async (
@@ -39,6 +68,10 @@ export const analyzeCandidate = async (
     email: string;
     textResponse: string;
     voiceTranscription?: string;
+    resumeContent?: string;
+    coverLetterContent?: string;
+    interviewQuestions?: string[];
+    expectedAnswers?: string[];
   }
 ): Promise<AnalysisResult> => {
   if (!openaiClient) {
@@ -47,23 +80,27 @@ export const analyzeCandidate = async (
 
   const analysisInput = candidateData.voiceTranscription || candidateData.textResponse;
   
+  const resumeAnalysis = candidateData.resumeContent ? `\nResume Content: "${candidateData.resumeContent}"` : '';
+  const coverLetterAnalysis = candidateData.coverLetterContent ? `\nCover Letter: "${candidateData.coverLetterContent}"` : '';
+  const questionAnswerAnalysis = candidateData.interviewQuestions?.length ? 
+    `\nInterview Questions & Answers:\n${candidateData.interviewQuestions.map((q, i) => `Q${i+1}: ${q}\nA${i+1}: ${candidateData.textResponse}`).join('\n')}` : '';
+
   const prompt = `
-Analyze this job candidate's responses and provide a comprehensive psychological and professional assessment.
+Analyze this job candidate comprehensively using advanced AI psychology and provide a detailed assessment for hiring decisions.
 
 Candidate Information:
 - Name: ${candidateData.name}
 - Email: ${candidateData.email}
-- Response: "${analysisInput}"
+- Interview Responses: "${analysisInput}"${resumeAnalysis}${coverLetterAnalysis}${questionAnswerAnalysis}
 
-Based on their self-introduction and responses, analyze:
-1. Emotional tone and confidence level
-2. Trustworthiness indicators
-3. Risk assessment for hiring
-4. Personality traits and behavioral patterns
-5. Communication effectiveness
-6. Leadership potential
-7. Technical aptitude signals
-8. Stress handling capabilities
+COMPREHENSIVE ANALYSIS REQUIRED:
+1. **Voice/Speech Analysis**: Analyze tone, confidence, speech patterns, emotional stability, and potential deception indicators
+2. **Behavioral Psychology**: Deep personality assessment, trustworthiness, loyalty prediction, consistency patterns
+3. **Professional Assessment**: Communication skills, technical aptitude, leadership potential, stress handling
+4. **Risk Assessment**: Hiring risk level based on behavioral patterns and response consistency
+5. **Cultural Fit**: Work style, team compatibility, organizational alignment
+6. **Resume Analysis**: If provided, analyze experience relevance, skill alignment, and red flags
+7. **Lie Detection**: Identify inconsistencies, evasive responses, or suspicious patterns
 
 Provide a detailed JSON response with the following structure:
 {
@@ -72,7 +109,7 @@ Provide a detailed JSON response with the following structure:
   "riskLevel": "Safe" | "Moderate" | "High",
   "loyaltyPrediction": [0-100],
   "consistencyScore": [0-100],
-  "behaviorPrediction": "brief description",
+  "behaviorPrediction": "detailed behavioral prediction",
   "mood": "Happy" | "Calm" | "Nervous" | "Aggressive",
   "cognitiveMapping": "High" | "Medium" | "Low",
   "careerGrowth": "Excellent" | "Good" | "Average" | "Poor",
@@ -83,9 +120,37 @@ Provide a detailed JSON response with the following structure:
   "stressHandling": [0-100],
   "confidenceLevel": [0-100],
   "emotionalStability": [0-100],
-  "strengths": ["strength1", "strength2", "strength3"],
-  "weaknesses": ["weakness1", "weakness2", "weakness3"],
-  "recommendations": ["recommendation1", "recommendation2", "recommendation3"]
+  "strengths": ["detailed strength 1", "detailed strength 2", "detailed strength 3"],
+  "weaknesses": ["specific weakness 1", "specific weakness 2", "specific weakness 3"],
+  "recommendations": ["actionable recommendation 1", "actionable recommendation 2", "actionable recommendation 3"],
+  "voiceAnalysis": {
+    "tonality": "professional analysis of voice tone",
+    "speechClarity": [0-100],
+    "emotionalStability": [0-100],
+    "confidence": [0-100],
+    "lyingIndicators": ["indicator1", "indicator2"]
+  },
+  "facialAnalysis": {
+    "attentiveness": [0-100],
+    "genuineness": [0-100],
+    "engagement": [0-100],
+    "trustworthiness": [0-100],
+    "microExpressions": ["expression1", "expression2"]
+  },
+  "resumeAnalysis": {
+    "relevanceScore": [0-100],
+    "experienceMatch": [0-100],
+    "skillsAlignment": [0-100],
+    "redFlags": ["flag1", "flag2"],
+    "highlights": ["highlight1", "highlight2"]
+  },
+  "detailedInsights": {
+    "workStyle": "detailed work style analysis",
+    "teamFit": "team compatibility assessment",
+    "culturalAlignment": [0-100],
+    "growthPotential": "growth potential assessment",
+    "riskFactors": ["risk1", "risk2"]
+  }
 }
 
 Respond with ONLY the JSON object, no additional text.

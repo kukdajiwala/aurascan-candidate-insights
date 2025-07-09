@@ -19,11 +19,13 @@ import {
   CheckCircle,
   User,
   Mail,
-  Loader2
+  Loader2,
+  Upload
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { analyzeCandidate, transcribeAudio, AnalysisResult, initializeOpenAI } from '@/lib/openai';
 import OpenAISetup from '@/components/OpenAISetup';
+import FileUpload from '@/components/FileUpload';
 
 const InterviewPage = () => {
   const navigate = useNavigate();
